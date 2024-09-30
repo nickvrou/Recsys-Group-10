@@ -1,69 +1,48 @@
+from sklearn.metrics.pairwise import cosine_similarity
 from recommender.cf_svd import recommend_predictions, get_svd_recommendations
-from recommender.content_based import build_combined_features, get_content_based_recommendations
-from recommender.hybrid_recsys import get_hybrid_recommendations
+from recommender.content_based import build_combined_features, get_content_based_recommendations, get_listing_index
 from recommender.data_loader import load_data
+import pandas as pd
 
-def run_content_based_recommender(df, listing_id, num_recommendations=5):
+
+def run_content_based_recommender(df_grouped, listing_id, num_recommendations=5):
     """
-    Runs the content-based recommendation system and prints the recommendations.
-    :param df: The input dataframe with listings.
-    :param listing_id: The listing to base recommendations on.
-    :param num_recommendations: Number of recommendations to return.
+    Runs the content-based recommendation system and returns the recommendations.
     """
-    # Build content-based features
-    df_grouped = df.groupby('listing_id').first().reset_index()
-    combined_features = build_combined_features(df_grouped)
-
-    # Get content-based recommendations
-    recommendations = get_content_based_recommendations(listing_id, df_grouped, combined_features, num_recommendations)
-
-    print("\nContent-Based Recommendations:")
-    print(recommendations[['listing_id', 'name', 'description']])
+    combined_features, group_df = build_combined_features(df_grouped)
+    recommendations = get_content_based_recommendations(listing_id, group_df, combined_features, num_recommendations)
+    print('Done content')
+    return recommendations, combined_features, group_df
 
 
-def run_svd_recommender(df, reviewer_id, num_recommendations=5):
+def run_svd_recommender(df, reviewer_id, num_recommendations=5, k=50):
     """
-    Runs the SVD-based recommendation system and prints the recommendations.
-    :param df: The input dataframe with reviewer-item interactions.
-    :param reviewer_id: The user to get recommendations for.
-    :param num_recommendations: Number of recommendations to return.
+    Runs the SVD-based recommendation system and returns the recommendations.
     """
-    # Run SVD to get predictions
-    k = 50  # Number of latent features for SVD
     predictions, users_index, items_index = recommend_predictions(df, k, 'reviewer_id', 'listing_id', 'polarity')
-
-    # Get SVD-based recommendations
     recommendations = get_svd_recommendations(predictions, reviewer_id, users_index, items_index,
                                               df['listing_id'].unique(), num_recommendations)
+    print('Done svd')
+    return recommendations, predictions, users_index, items_index
 
-    print("\nSVD-Based (Collaborative Filtering) Recommendations:")
-    print(recommendations[['listing_id', 'predicted_polarity']])
 
-
-def run_hybrid_recommender(df, listing_id, reviewer_id, num_recommendations=5, alpha=0.5):
+def run_hybrid_recommender(listing_id, reviewer_id, content_based_recs, combined_features, group_df,
+                           svd_recs, predictions, users_index, items_index, alpha=0.5, num_recommendations=5):
     """
-    Runs the hybrid recommendation system and prints the recommendations.
-    :param df: The input dataframe with listings and reviewer-item interactions.
-    :param listing_id: The listing to base content-based recommendations on.
-    :param reviewer_id: The reviewer to base SVD recommendations on.
-    :param num_recommendations: Number of recommendations to return.
-    :param alpha: The weight to combine content-based and SVD recommendations.
+    Runs the hybrid recommendation system using pre-calculated content-based and SVD recommendations.
     """
-    # Build content-based features
-    df_grouped = df.groupby('listing_id').first().reset_index()
-    combined_features = build_combined_features(df_grouped)
+    # Merge the recommendations based on listing_id
+    hybrid_recs = pd.merge(content_based_recs[['listing_id', 'cb_score']],
+                           svd_recs[['listing_id', 'predicted_polarity']], on='listing_id', how='inner')
 
-    # Run SVD to get predictions
-    k = 50  # Number of latent features for SVD
-    predictions, users_index, items_index = recommend_predictions(df, k, 'reviewer_id', 'listing_id', 'polarity')
+    # Normalize the collaborative filtering score (predicted polarity)
+    hybrid_recs['cf_score'] = hybrid_recs['predicted_polarity'] / hybrid_recs['predicted_polarity'].max()
 
-    # Get hybrid recommendations
-    hybrid_recommendations = get_hybrid_recommendations(listing_id, reviewer_id, df_grouped, combined_features,
-                                                        predictions, users_index, items_index, alpha,
-                                                        num_recommendations)
+    # Calculate the hybrid score (weighted combination)
+    hybrid_recs['hybrid_score'] = alpha * hybrid_recs['cf_score'] + (1 - alpha) * hybrid_recs['cb_score']
 
-    print("\nHybrid Recommendations (Content-Based + SVD):")
-    print(hybrid_recommendations[['listing_id', 'hybrid_score']])
+    # Return top N recommendations sorted by the hybrid score
+    return hybrid_recs.sort_values(by='hybrid_score', ascending=False).head(num_recommendations)
 
 
 def run_recommender_pipeline():
@@ -71,20 +50,27 @@ def run_recommender_pipeline():
     Main function to run all recommenders (content-based, SVD, and hybrid).
     """
     # Load preprocessed data
-    df = load_data('preprocessed_listings.csv')
+    df = load_data('final_preprocessed_df (3).csv')
 
-    # Define example listing_id and reviewer_id for recommendations
-    listing_id = 'synthetic_001'  # Example listing_id for content-based
-    reviewer_id = df['reviewer_id'].iloc[0]  # Example reviewer_id for SVD
+    listing_id = '307621'
+    reviewer_id = df['reviewer_id'].iloc[0]
 
-    # Run Content-Based Recommender
-    run_content_based_recommender(df, listing_id, num_recommendations=5)
+    # 1. Run Content-Based Recommender
+    content_based_recs, combined_features, group_df = run_content_based_recommender(df, listing_id, num_recommendations=5)
+    content_based_recs['cb_score'] = cosine_similarity(
+        combined_features[get_listing_index(listing_id, group_df)],
+        combined_features[content_based_recs.index]).flatten()
 
-    # Run SVD Recommender (Collaborative Filtering)
-    run_svd_recommender(df, reviewer_id, num_recommendations=5)
+    # 2. Run SVD Recommender (Collaborative Filtering)
+    svd_recs, predictions, users_index, items_index = run_svd_recommender(df, reviewer_id, num_recommendations=5)
 
-    # Run Hybrid Recommender (Content-Based + SVD)
-    run_hybrid_recommender(df, listing_id, reviewer_id, num_recommendations=5, alpha=0.5)
+    # 3. Run Hybrid Recommender (Content-Based + SVD)
+    hybrid_recs = run_hybrid_recommender(listing_id, reviewer_id, content_based_recs, combined_features, group_df,
+                                         svd_recs, predictions, users_index, items_index, alpha=0.5, num_recommendations=5)
+
+    # Display recommendations
+    print("\nHybrid Recommendations (Content-Based + SVD):")
+    print(hybrid_recs[['listing_id', 'hybrid_score']])
 
 
 if __name__ == "__main__":
