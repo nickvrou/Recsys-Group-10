@@ -20,7 +20,7 @@ def create_utility_matrix(df, user_col, item_col, value_col):
 def get_index_mappings(matrix):
     """
     Get mappings from user/listing IDs to row/column indices
-    :param matrix: utility matrix
+    :param matrix: utility matrix (Pandas DataFrame)
     :return: dictionaries mapping users to rows and listings to columns
     """
     user_rows = list(matrix.index)
@@ -48,14 +48,16 @@ def recommend_predictions(df, k, user_col, item_col, value_col):
     # Perform truncated SVD
     svd = TruncatedSVD(n_components=k, random_state=42)
 
-    U = svd.fit_transform(util_mat_demeaned)  # User latent factors
-    Vt = svd.components_  # Item latent factors
+    U = svd.fit_transform(util_mat_demeaned)
+    sigma = svd.singular_values_
+    Vt = svd.components_
 
+    # Now get the mappings using the original utility matrix (Pandas DataFrame)
     users_index, items_index = get_index_mappings(util_mat)
+
     return U, Vt, users_index, items_index, item_means
 
 
-# Get top N SVD-based recommendations
 def get_svd_recommendations(U, Vt, user_latent_factors, items_index, item_means, listing_id_array,
                             num_recommendations=5):
     """
@@ -79,4 +81,3 @@ def get_svd_recommendations(U, Vt, user_latent_factors, items_index, item_means,
     }).sort_values(by='predicted_polarity', ascending=False).head(num_recommendations)
 
     return recommendations
-
