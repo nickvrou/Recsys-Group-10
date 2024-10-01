@@ -1,6 +1,6 @@
 import numpy as np
 import pandas as pd
-from scipy.sparse.linalg import svds
+from sklearn.decomposition import TruncatedSVD
 
 
 # Utility matrix creation for SVD
@@ -20,7 +20,7 @@ def create_utility_matrix(df, user_col, item_col, value_col):
 def get_index_mappings(matrix):
     """
     Get mappings from user/listing IDs to row/column indices
-    :param matrix: utility matrix
+    :param matrix: utility matrix (Pandas DataFrame)
     :return: dictionaries mapping users to rows and listings to columns
     """
     user_rows = list(matrix.index)
@@ -32,56 +32,52 @@ def get_index_mappings(matrix):
 
 # SVD for recommendation prediction
 def recommend_predictions(df, k, user_col, item_col, value_col):
-    """
-    Run SVD on the utility matrix and return predicted polarity values
-    :param df: dataframe with known reviewer/listing pairs
-    :param k: number of latent factors to keep for SVD
-    :param user_col: user column name
-    :param item_col: item column name
-    :param value_col: value column name (e.g., polarity)
-    :return: predicted matrix, users_index, and items_index
-    """
+    # Create the utility matrix
     util_mat = create_utility_matrix(df, user_col, item_col, value_col)
-    users_index, items_index = get_index_mappings(util_mat)
 
-    # Mask NaN and fill them with item means
+    # Handle missing values and fill them with item means
     mask = np.isnan(util_mat)
     masked_arr = np.ma.masked_array(util_mat, mask)
     item_means = np.mean(masked_arr, axis=0)
     util_mat = masked_arr.filled(item_means)
 
-    # Demean utility matrix
+    # Demean the utility matrix
     means = np.tile(item_means, (util_mat.shape[0], 1))
     util_mat_demeaned = util_mat - means
 
-    # Perform SVD
-    U, sigma, Vt = svds(util_mat_demeaned, k=k)
-    sigma = np.diag(sigma)
-    all_predicted_polarity = np.dot(np.dot(U, sigma), Vt) + means
+    # Perform truncated SVD
+    svd = TruncatedSVD(n_components=k, random_state=42)
 
-    return all_predicted_polarity, users_index, items_index
+    U = svd.fit_transform(util_mat_demeaned)
+    sigma = svd.singular_values_
+    Vt = svd.components_
 
-def get_svd_recommendations(predictions, reviewer_id, users_index, items_index, listing_id_array,
+    # Now get the mappings using the original utility matrix (Pandas DataFrame)
+    users_index, items_index = get_index_mappings(util_mat)
+
+    return U, Vt, users_index, items_index, item_means
+
+
+def get_svd_recommendations(U, Vt, user_latent_factors, items_index, item_means, listing_id_array,
                             num_recommendations=5):
     """
     Get top N recommendations for a reviewer based on SVD predictions
-    :param predictions: predicted matrix from SVD
-    :param reviewer_id: selected reviewer ID
-    :param users_index: mapping from reviewer IDs to row indices
+    :param U: User latent factors from SVD
+    :param Vt: Item latent factors from SVD
+    :param user_latent_factors: User latent factor vector for the reviewer
     :param items_index: mapping from item IDs to column indices
+    :param item_means: The mean values of items for filling missing values
     :param listing_id_array: array of all listing IDs
     :param num_recommendations: number of top recommendations to return
     :return: DataFrame with top N recommendations
     """
-    u_index = users_index[reviewer_id]
-    item_indices = [items_index[listing_id_array[i]] for i in range(len(listing_id_array))]
+    # Calculate predicted ratings for all items for the given user
+    pred_user = np.dot(user_latent_factors, Vt) + item_means
 
-    pred_user = [predictions[u_index, i_index] for i_index in item_indices]
-
+    # Create a DataFrame with listing IDs and predicted polarity values
     recommendations = pd.DataFrame({
         'listing_id': listing_id_array,
         'predicted_polarity': pred_user
     }).sort_values(by='predicted_polarity', ascending=False).head(num_recommendations)
 
     return recommendations
-

@@ -1,10 +1,10 @@
 import pandas as pd
 from sklearn.metrics.pairwise import cosine_similarity
-from recommender.content_based import get_content_based_recommendations
-from recommender.cf_svd import get_svd_recommendations
+from content_based import get_content_based_recommendations
+from cf_svd import get_svd_recommendations
 
 
-def get_hybrid_recommendations(listing_id, reviewer_id, df_grouped, combined_features, svd_predictions, users_index,
+def get_hybrid_recommendations(listing_id, reviewer_id, df_grouped, content_based_recs, svd_predictions, users_index,
                                items_index, alpha=0.5, num_recommendations=5):
     """
     Hybrid recommender that combines content-based and collaborative filtering recommendations.
@@ -12,7 +12,7 @@ def get_hybrid_recommendations(listing_id, reviewer_id, df_grouped, combined_fea
     :param listing_id: The listing_id to base content-based recommendations on
     :param reviewer_id: The reviewer_id for collaborative filtering recommendations
     :param df_grouped: The preprocessed DataFrame with listing data
-    :param combined_features: Feature matrix used for content-based filtering
+    :param content_based_recs: Precomputed content-based recommendations (with cb_score)
     :param svd_predictions: Predicted matrix from SVD
     :param users_index: Mapping from user IDs to row indices (SVD)
     :param items_index: Mapping from listing IDs to column indices (SVD)
@@ -21,12 +21,9 @@ def get_hybrid_recommendations(listing_id, reviewer_id, df_grouped, combined_fea
     :return: DataFrame with hybrid recommendations
     """
 
-    # Get Content-Based Recommendations
-    content_based_recs = get_content_based_recommendations(listing_id, df_grouped, combined_features,
-                                                           num_recommendations)
-    content_based_recs['cb_score'] = cosine_similarity(
-        combined_features[get_listing_index(listing_id, df_grouped)],
-        combined_features[content_based_recs.index]).flatten()
+    # Reuse precomputed content-based recommendations and scores
+    if 'cb_score' not in content_based_recs.columns:
+        raise ValueError("Content-based recommendations must include 'cb_score'.")
 
     # Get SVD-Based Recommendations
     svd_recs = get_svd_recommendations(svd_predictions, reviewer_id, users_index, items_index,
