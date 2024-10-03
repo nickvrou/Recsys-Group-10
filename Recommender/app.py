@@ -1,55 +1,36 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
-from scipy.sparse.linalg import svds
-from sklearn.metrics.pairwise import cosine_similarity
+from content_based import build_combined_features, get_content_based_recommendations
 
-from content_based import build_combined_features
-
-# Utility matrix creation for SVD
-def create_utility_matrix(df, user_col, item_col, value_col):
-    """Create a pivot table utility matrix from the given dataframe"""
-    return df.pivot_table(index=user_col, columns=item_col, values=value_col)
-
-# Keep track of user and listing indices
-def get_index_mappings(matrix):
-    """Get mappings from user/listing IDs to row/column indices"""
-    user_rows = list(matrix.index)
-    listing_cols = list(matrix.columns)
-    users_index = {user_rows[i]: i for i in range(len(user_rows))}
-    items_index = {listing_cols[i]: i for i in range(len(listing_cols))}
-    return users_index, items_index
-
-# SVD for recommendation prediction
-def recommend_predictions(df, k, user_col, item_col, value_col):
-    """Run SVD on the utility matrix and return predicted polarity values"""
-    util_mat = create_utility_matrix(df, user_col, item_col, value_col)
-    users_index, items_index = get_index_mappings(util_mat)
-    
-    # Mask NaN and fill them with item means
-    mask = np.isnan(util_mat)
-    masked_arr = np.ma.masked_array(util_mat, mask)
-    item_means = np.mean(masked_arr, axis=0)
-    util_mat = masked_arr.filled(item_means)
-    
-    # Demean utility matrix
-    util_mat_demeaned = util_mat - item_means
-    
-    # Perform SVD
-    U, sigma, Vt = svds(util_mat_demeaned, k=k)
-    sigma = np.diag(sigma)
-    
-    # Predicted matrix
-    predicted_matrix = np.dot(np.dot(U, sigma), Vt) + item_means
-    return predicted_matrix, users_index, items_index
-
-# Sample DataFrame (replace with actual Airbnb data)
+# Sample Airbnb data (replace with your actual data)
 data = {
-    'reviewer_id': [1, 2, 3, 1, 2, 3, 4],
-    'listing_id': [101, 102, 103, 103, 101, 102, 101],
-    'polarity': [5, 3, 4, 4, 5, 2, 3]
+    'listing_id': ['101', '102', '103', '104', '105'],
+    'review_scores_rating': [4.5, 4.2, 3.8, 4.7, 4.1],
+    'price': [150, 200, 100, 180, 130],
+    'neighbourhood_cleansed': ['Centrum', 'West', 'East', 'South', 'North'],
+    'property_type': ['Apartment', 'House', 'Apartment', 'House', 'Apartment'],
+    'amenities': ['Wi-Fi, Kitchen', 'Wi-Fi, Parking', 'Kitchen, Parking', 'Wi-Fi', 'Wi-Fi, Kitchen, Parking'],
+    'comments': ['Great place!', 'Nice stay', 'Good for family', 'Perfect location', 'Spacious and cozy'],
+    'description': ['Cozy apartment', 'Spacious house', 'Family-friendly', 'Central location', 'Quiet area'],
+    'name': ['Lovely Apt', 'Big House', 'Family Apt', 'Central Studio', 'Quiet Home']
 }
+
+# Create the DataFrame
 df_grouped = pd.DataFrame(data)
+
+# Add missing columns with placeholder values
+missing_columns = [
+    'availability_365', 'bathrooms', 'bedrooms', 'beds', 'distance_to_center', 
+    'host_experience', 'host_is_superhost', 'host_total_listings_count', 
+    'maximum_nights', 'minimum_nights', 'number_of_reviews', 'polarity', 
+    'synthetic_rating', 'value_for_money'
+]
+
+# Add default values for each missing column
+for column in missing_columns:
+    if column not in df_grouped.columns:
+        df_grouped[column] = 0  # Default for numeric columns
 
 # Streamlit app layout
 st.title("Airbnb Recommender System for a Family Getaway")
@@ -69,7 +50,7 @@ bedrooms = st.number_input("Number of Bedrooms", min_value=1, max_value=5, value
 price_range = st.slider("Price Range (per night)", 50, 500, (100, 300))
 
 # Distance to center
-distance_to_center = st.slider("Distance to center in km", 1, 20, (5,10))
+distance_to_center = st.slider("Distance to center in km", 1, 20, (5, 10))
 
 # Description
 description = st.text_input("Enter description")
@@ -81,47 +62,40 @@ amenities = st.multiselect(
     default=["Wi-Fi", "Kitchen"]
 )
 
-# Button to get recommendations
 if st.button("Get Recommendations"):
-    k = 2  # Latent factors for SVD (adjustable)
+   
+     # Assign the actual values for the required fields, and set the rest to None
+    listing_id = {
+        'comments': None,
+        'name': None,
+        'description': description,  # User input description
+        'property_type': None,
+        'review_scores_rating': None,
+        'bathrooms': None,
+        'bedrooms': bedrooms,  # Number of bedrooms input by the user
+        'beds': guests,  # Number of guests is mapped to beds
+        'minimum_nights': (check_out - check_in).days,  # Days between check-in and check-out
+        'maximum_nights': None,
+        'distance_to_center': (distance_to_center[0] + distance_to_center[1]) / 2,  # Median of distance range
+        'polarity': None,
+        'synthetic_rating': None,
+        'amenities': ', '.join(amenities),  # Selected amenities
+        'number_of_reviews': None,
+        'price': (price_range[0] + price_range[1]) / 2,  # Median of price range
+        'date': None
+    }
+
+    st.write("### User Input for Listing:")
+    st.write(listing_id)
+
+    combined_features, df_grouped = build_combined_features(df_grouped)
+
+    listing_id_str = '101'  
     
-    
-    # Using content-based recommendation logic from content_based.py
+    recommendations = get_content_based_recommendations(listing_id_str, df_grouped, combined_features)
 
-    # Features include neighbourhood, property type, and amenities
-    def content_based_recommendations(dataframe, user_preferences):
-        # Use the build_combined_features function from the content_based.py
-        combined_features = build_combined_features(dataframe)
-        
-        # Calculate cosine similarity between user preferences and listings
-        similarity_matrix = cosine_similarity(user_preferences, combined_features)
-        
-        # Sort and return top N recommendations
-        top_recommendations_idx = np.argsort(similarity_matrix[0])[::-1][:3]
-        return dataframe.iloc[top_recommendations_idx]
-
-    # Build combined features for listings
-    user_preferences = [[1, 0, 0, 1]]  # Simulating user preference input
-    recommendations = content_based_recommendations(df_grouped, user_preferences)
-
-    # Display top recommendations to the user
     st.write("### Top Content-Based Recommendations:")
-    st.write(recommendations[['listing_id', 'neighbourhood_cleansed', 'price']])
-    
-    predicted_matrix, users_index, items_index = recommend_predictions(df_grouped, k, 'reviewer_id', 'listing_id', 'polarity')
-    
-    # Simulate showing top recommendations
-    st.write("### Recommendations:")
-    user_id = 1 
-    
-    if user_id in users_index:
-        user_idx = users_index[user_id]
-        user_predictions = predicted_matrix[user_idx, :]
-        
-        # Get top N recommendations
-        top_recommendations = np.argsort(user_predictions)[::-1][:3]
-        for idx in top_recommendations:
-            listing_id = list(items_index.keys())[list(items_index.values()).index(idx)]
-            st.write(f"Recommended Airbnb listing ID: {listing_id}")
+    if not recommendations.empty:
+        st.write(recommendations[['listing_id', 'neighbourhood_cleansed', 'price']])
     else:
-        st.write("No recommendations available for this user.")
+        st.write("No recommendations found for the given listing.")
