@@ -52,7 +52,24 @@ def run_recommender_pipeline():
     # Load preprocessed data
     df = load_data('C:/Users/vroun\Documents/GitHub/Recsys-Group-10/recommender/final_preprocessed_df (3).csv')
 
-    listing_id = '307621'
+    listing_id = {
+        'comments': None,
+        'name': None,
+        'description': None,
+        'property_type': None,
+        'review_scores_rating': None,
+        'bathrooms': None,
+        'bedrooms': None,
+        'beds': None,
+        'minimum_nights': None,
+        'maximum_nights': None,
+        'distance_to_center': None,
+        'polarity': None,
+        'synthetic_rating': None,
+        'amenities': None,
+        'number_of_reviews':None,
+        'date': None
+    }
     reviewer_id = df['reviewer_id'].iloc[0]
 
     # 1. Run Content-Based Recommender
