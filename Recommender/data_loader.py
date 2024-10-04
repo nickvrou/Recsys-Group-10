@@ -34,4 +34,7 @@ def load_data(file_path):
 
     df['host_is_superhost'] = df['host_is_superhost'].apply(lambda x: 1 if x == 't' else 0)
 
+    df['listing_id'] = df['listing_id'].astype(str).str.strip()
+
+
     return df

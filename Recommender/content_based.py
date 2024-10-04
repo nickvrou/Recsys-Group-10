@@ -7,8 +7,10 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 def get_listing_index(listing_id, df_grouped):
     try:
+        print("dsds")
         return df_grouped[df_grouped['listing_id'] == listing_id].index[0]
     except IndexError:
+        print("cdiadpasna")
         return None
 
 def build_combined_features(df):

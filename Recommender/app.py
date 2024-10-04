@@ -2,35 +2,9 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 from content_based import build_combined_features, get_content_based_recommendations
+from data_loader import load_data
 
-# Sample Airbnb data (replace with your actual data)
-data = {
-    'listing_id': ['101', '102', '103', '104', '105'],
-    'review_scores_rating': [4.5, 4.2, 3.8, 4.7, 4.1],
-    'price': [150, 200, 100, 180, 130],
-    'neighbourhood_cleansed': ['Centrum', 'West', 'East', 'South', 'North'],
-    'property_type': ['Apartment', 'House', 'Apartment', 'House', 'Apartment'],
-    'amenities': ['Wi-Fi, Kitchen', 'Wi-Fi, Parking', 'Kitchen, Parking', 'Wi-Fi', 'Wi-Fi, Kitchen, Parking'],
-    'comments': ['Great place!', 'Nice stay', 'Good for family', 'Perfect location', 'Spacious and cozy'],
-    'description': ['Cozy apartment', 'Spacious house', 'Family-friendly', 'Central location', 'Quiet area'],
-    'name': ['Lovely Apt', 'Big House', 'Family Apt', 'Central Studio', 'Quiet Home']
-}
-
-# Create the DataFrame
-df_grouped = pd.DataFrame(data)
-
-# Add missing columns with placeholder values
-missing_columns = [
-    'availability_365', 'bathrooms', 'bedrooms', 'beds', 'distance_to_center', 
-    'host_experience', 'host_is_superhost', 'host_total_listings_count', 
-    'maximum_nights', 'minimum_nights', 'number_of_reviews', 'polarity', 
-    'synthetic_rating', 'value_for_money'
-]
-
-# Add default values for each missing column
-for column in missing_columns:
-    if column not in df_grouped.columns:
-        df_grouped[column] = 0  # Default for numeric columns
+df = load_data('C:/Users/vroun/Documents/GitHub/Recsys-Group-10/recommender/final_preprocessed_df (3).csv')
 
 # Streamlit app layout
 st.title("Airbnb Recommender System for a Family Getaway")
@@ -65,11 +39,12 @@ amenities = st.multiselect(
 if st.button("Get Recommendations"):
    
      # Assign the actual values for the required fields, and set the rest to None
-    listing_id = {
-        'comments': None,
-        'name': None,
+    user_listing = {
+        'listing_id': '6969',
+        'comments': '',
+        'name': '',
         'description': description,  # User input description
-        'property_type': None,
+        'property_type': '',
         'review_scores_rating': None,
         'bathrooms': None,
         'bedrooms': bedrooms,  # Number of bedrooms input by the user
@@ -86,16 +61,20 @@ if st.button("Get Recommendations"):
     }
 
     st.write("### User Input for Listing:")
-    st.write(listing_id)
+    st.write(user_listing)
 
-    combined_features, df_grouped = build_combined_features(df_grouped)
+    user_listing_df = pd.DataFrame([user_listing])
 
-    listing_id_str = '101'  
+    df = pd.concat([user_listing_df, df], ignore_index=True)
+
+    combined_features = build_combined_features(df)
+
+    listing_id = '6969' 
     
-    recommendations = get_content_based_recommendations(listing_id_str, df_grouped, combined_features)
+    recommendations = get_content_based_recommendations(listing_id, df, combined_features)
 
     st.write("### Top Content-Based Recommendations:")
     if not recommendations.empty:
-        st.write(recommendations[['listing_id', 'neighbourhood_cleansed', 'price']])
+        st.write(recommendations[['listing_id', 'neighbourhood_cleansed','review_scores_rating', 'price']])
     else:
         st.write("No recommendations found for the given listing.")
