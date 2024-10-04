@@ -7,10 +7,8 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 
 def get_listing_index(listing_id, df_grouped):
     try:
-        print("dsds")
         return df_grouped[df_grouped['listing_id'] == listing_id].index[0]
     except IndexError:
-        print("cdiadpasna")
         return None
 
 def build_combined_features(df):
@@ -31,13 +29,8 @@ def build_combined_features(df):
         'polarity': 'mean',
         'synthetic_rating': 'first',
         'amenities': lambda x: ','.join(set(','.join(x).split(','))),
-        'host_experience': 'mean',
-        'host_is_superhost': 'first',
-        'host_total_listings_count': 'mean',
         'number_of_reviews': 'mean',
-        'price': 'mean',
-        'availability_365': 'mean',
-        'value_for_money': 'mean'
+        'price': 'mean'
     }).reset_index()
 
     df_grouped['listing_id'] = df_grouped['listing_id'].astype(str).str.strip()
@@ -61,9 +54,8 @@ def build_combined_features(df):
     # Scaling structured features
     structured_features = np.array(df_grouped[['review_scores_rating', 'bedrooms', 'beds',
                                                'minimum_nights', 'maximum_nights', 'distance_to_center',
-                                               'polarity', 'bathrooms', 'host_experience',
-                                               'host_is_superhost', 'host_total_listings_count', 'number_of_reviews',
-                                               'price', 'availability_365', 'value_for_money']])
+                                               'polarity', 'bathrooms', 'number_of_reviews',
+                                               'price']])
     scaler = StandardScaler()
 
     structured_features_scaled = scaler.fit_transform(structured_features)
@@ -73,16 +65,19 @@ def build_combined_features(df):
         [tfidf_matrix, neighbourhood_encoded, property_type_encoded, amenities_matrix, structured_features_scaled])
 
     # Convert to CSR format for slicing
-    return combined_features.tocsr(), df_grouped
+    return combined_features.tocsr()
 
 
 # Content-Based Recommendation Engine
 def get_content_based_recommendations(listing_id, df_grouped, combined_features, num_recommendations=5):
 
     listing_index = get_listing_index(listing_id, df_grouped)
+    print(listing_index)
 
     if listing_index is None:
+
         return pd.DataFrame()
+
 
     # Now combined_features is in CSR format, and slicing will work
     sim_scores = list(enumerate(cosine_similarity(combined_features[listing_index], combined_features)[0]))
