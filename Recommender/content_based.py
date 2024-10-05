@@ -5,15 +5,20 @@ from scipy.sparse import hstack
 import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 
+
 # Helper function to get the index of a listing based on its ID
 def get_listing_index(listing_id, df_grouped):
+    listing_id = str(listing_id).strip()
+    df_grouped['listing_id'] = df_grouped['listing_id'].astype(str).str.strip()
     try:
         return df_grouped[df_grouped['listing_id'] == listing_id].index[0]
     except IndexError:
         return None
 
+
 # Function to build combined features for each listing
 def build_combined_features(df):
+
     df_grouped = df.groupby('listing_id').agg({
         'comments': lambda x: ' '.join(x),
         'name': 'first',
@@ -30,10 +35,11 @@ def build_combined_features(df):
         'synthetic_rating': 'mean',
         'amenities': lambda x: ','.join(set(','.join(x).split(','))),
         'number_of_reviews': 'mean',
-        'date': 'first'
+        'date': 'first',
+        'price': 'mean',
+        'accommodates': 'first'
     }).reset_index()
 
-    df_grouped['listing_id'] = df_grouped['listing_id'].astype(str).str.strip()
     reference_date = pd.to_datetime('1970-01-01')
     df_grouped['date'] = (pd.to_datetime(df_grouped['date']) - reference_date).dt.days
 
@@ -46,11 +52,13 @@ def build_combined_features(df):
     amenities_matrix = vectorizer_amenities.fit_transform(df_grouped['amenities'])
 
     vectorizer = TfidfVectorizer(stop_words='english', ngram_range=(1, 2))
-    tfidf_matrix = vectorizer.fit_transform(df_grouped['name'] + " " + df_grouped['description'] + " " + df_grouped['comments'])
+    tfidf_matrix = vectorizer.fit_transform(
+        df_grouped['name'] + " " + df_grouped['description'] + " " + df_grouped['comments'])
 
     # Scaling structured features
-    structured_features = np.array(df_grouped[['review_scores_rating', 'bedrooms', 'beds', 'minimum_nights', 
-                                               'maximum_nights', 'distance_to_center', 'polarity', 'bathrooms', 'date']])
+    structured_features = np.array(df_grouped[['review_scores_rating', 'bedrooms', 'beds', 'minimum_nights',
+                                               'maximum_nights', 'distance_to_center', 'polarity', 'bathrooms',
+                                               'date']])
     scaler = StandardScaler()
     structured_features_scaled = scaler.fit_transform(structured_features)
 
@@ -62,10 +70,15 @@ def build_combined_features(df):
 
 # Content-Based Recommendation Engine
 def get_content_based_recommendations(listing_id, df_grouped, combined_features, num_recommendations=5):
+
     listing_index = get_listing_index(listing_id, df_grouped)
+
+    print(f'Listing index : {listing_index}')
 
     if listing_index is None:
         return pd.DataFrame()
+
+    print(combined_features[listing_index])
 
     # Now combined_features is in CSR format, and slicing will work
     sim_scores = list(enumerate(cosine_similarity(combined_features[listing_index], combined_features)[0]))
@@ -98,7 +111,8 @@ def mmr(query_embedding, item_embeddings, already_selected, lambda_param, num_re
 
         # Calculate diversity (similarity to already selected items)
         if len(selected_items) > 0:
-            diversity_scores = np.max(cosine_similarity(item_embeddings[remaining_items], item_embeddings[selected_items]), axis=1)
+            diversity_scores = np.max(
+                cosine_similarity(item_embeddings[remaining_items], item_embeddings[selected_items]), axis=1)
         else:
             diversity_scores = np.zeros(len(remaining_items))  # No diversity score if nothing selected yet
 
@@ -111,8 +125,10 @@ def mmr(query_embedding, item_embeddings, already_selected, lambda_param, num_re
 
     return selected_items
 
+
 # Apply MMR to get diverse recommendations
 def get_mmr_recommendations(listing_id, df_grouped, feature_matrix, lambda_param=0.8, num_recommendations=5):
+
     listing_index = get_listing_index(listing_id, df_grouped)
 
     if listing_index is None:
@@ -122,7 +138,8 @@ def get_mmr_recommendations(listing_id, df_grouped, feature_matrix, lambda_param
     query_embedding = feature_matrix[listing_index]
 
     # Apply MMR to get the most relevant and diverse items
-    recommended_indices = mmr(query_embedding, feature_matrix, already_selected=[listing_index], lambda_param=lambda_param, num_recommendations=num_recommendations)
+    recommended_indices = mmr(query_embedding, feature_matrix, already_selected=[listing_index],
+                              lambda_param=lambda_param, num_recommendations=num_recommendations)
 
     recommendations = df_grouped.iloc[recommended_indices]
     return recommendations
