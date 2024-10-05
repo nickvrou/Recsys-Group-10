@@ -10,8 +10,13 @@ def filter_listings_by_constraints(df, max_price, min_price, min_accommodates):
                      (df['accommodates'] >= min_accommodates)]
     return filtered_df
 
-# Load the data
-df = load_data('C:/Users/astratou/Downloads/final_preprocessed_df (3).csv')
+# Load the preprocessed data and the original dataset
+
+df_preprocessed = load_data('C:/Users/astratou/Downloads/final_preprocessed_df (3).csv')
+
+df_original = pd.read_csv('C:/Users/astratou\Downloads\original_dataset.csv')
+
+df_original['listing_id'] = df_original['listing_id'].astype(str).str.strip()
 
 # Streamlit app layout
 st.title("Airbnb Recommender System for a Family Getaway")
@@ -59,7 +64,7 @@ if st.button("Get Recommendations"):
         'amenities': ', '.join(amenities),  # Convert amenities list to string
         'comments': description,  # User description as comments
         'description': description,
-        'name': 'Ma',  # No name, leave as None
+        'name': 'Custom Listing',  # Custom name for user input
         'bathrooms': bathrooms,
         'bedrooms': bedrooms,
         'beds': guests,  # Number of guests = number of beds
@@ -74,26 +79,66 @@ if st.button("Get Recommendations"):
     }
 
     # Append the user input as a new row to df_grouped for similarity comparison
-    df_with_user = pd.concat([df, pd.DataFrame([user_input])], ignore_index=True)
+    df_with_user = pd.concat([df_preprocessed, pd.DataFrame([user_input])], ignore_index=True)
 
     # Filter listings by constraints like price and number of guests
     df_with_user_c = filter_listings_by_constraints(df_with_user, price_range[1], price_range[0], guests)
 
     if df_with_user_c.empty:
-
         st.write("No listings found based on your constraints.")
-
     else:
-
         combined_features, df_grouped = build_combined_features(df_with_user_c)
 
         listing_id_str = 'user_input'
 
         recommendations = get_content_based_recommendations(listing_id_str, df_grouped, combined_features)
 
-        st.write("### Top Content-Based Recommendations:")
-
         if not recommendations.empty:
-            st.write(recommendations[['name', 'description', 'review_scores_rating', 'bathrooms', 'bedrooms', 'distance_to_center', 'amenities', 'property_type', 'price', 'accommodates']])
+            # Get the recommended listing IDs
+            recommended_listing_ids = recommendations['listing_id'].values
+
+            # Find the original data for these listing IDs
+            original_recommendations = df_original[df_original['listing_id'].isin(recommended_listing_ids)]
+
+            # Truncate long text fields for better readability
+            original_recommendations['description'] = original_recommendations['description'].apply(lambda x: x[:150] + '...' if len(x) > 150 else x)
+            original_recommendations['amenities'] = original_recommendations['amenities'].apply(lambda x: x[:150] + '...' if len(x) > 150 else x)
+
+            # Convert bathrooms, bedrooms, distance_to_center, and price to integers
+            original_recommendations['bathrooms'] = original_recommendations['bathrooms'].astype(int)
+            original_recommendations['bedrooms'] = original_recommendations['bedrooms'].astype(int)
+            original_recommendations['distance_to_center'] = original_recommendations['distance_to_center'].astype(int)
+            original_recommendations['price'] = original_recommendations['price'].astype(int)
+
+            # Rename the columns with capitalized and professional names
+            original_recommendations = original_recommendations.rename(columns={
+                'name': 'Name',
+                'description': 'Description',
+                'review_scores_rating': 'Review Score',
+                'bathrooms': 'Bathrooms',
+                'bedrooms': 'Bedrooms',
+                'distance_to_center': 'Distance to Center (km)',
+                'amenities': 'Amenities',
+                'property_type': 'Property Type',
+                'price': 'Price (€)',
+                'accommodates': 'Accommodates'
+            })
+
+            # Style the table using Pandas Styler
+            def highlight_max(s):
+                is_max = s == s.max()
+                return ['background-color: lightgreen' if v else '' for v in is_max]
+
+            styled_df = original_recommendations[['Name', 'Description', 'Review Score', 'Bathrooms',
+                                                 'Bedrooms', 'Distance to Center (km)', 'Amenities',
+                                                 'Property Type', 'Price (€)', 'Accommodates']].style.apply(highlight_max, subset=['Review Score'])
+
+            # Set table styles for bold headers and remove index
+            styled_df = styled_df.hide(axis="index").set_table_styles(
+                [{'selector': 'th', 'props': [('font-weight', 'bold')]}]
+            )
+
+            # Display the table with Streamlit
+            st.table(styled_df)
         else:
             st.write("No recommendations found for the given listing.")

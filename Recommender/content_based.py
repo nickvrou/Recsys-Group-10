@@ -73,12 +73,8 @@ def get_content_based_recommendations(listing_id, df_grouped, combined_features,
 
     listing_index = get_listing_index(listing_id, df_grouped)
 
-    print(f'Listing index : {listing_index}')
-
     if listing_index is None:
         return pd.DataFrame()
-
-    print(combined_features[listing_index])
 
     # Now combined_features is in CSR format, and slicing will work
     sim_scores = list(enumerate(cosine_similarity(combined_features[listing_index], combined_features)[0]))
