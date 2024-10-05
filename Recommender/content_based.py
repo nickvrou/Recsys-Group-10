@@ -88,7 +88,12 @@ def get_content_based_recommendations(listing_id, df_grouped, combined_features,
     # Sort similarity scores in descending order and pick top recommendations
     sim_scores = sorted(sim_scores, key=lambda x: x[1], reverse=True)
 
-    similar_indices = [i[0] for i in sim_scores[1:num_recommendations + 1]]
+    # Include the input listing itself in the recommendations
+
+
+
+
+    similar_indices = [i[0] for i in sim_scores[:num_recommendations]]
 
     recommendations = df_grouped.iloc[similar_indices]
 
