@@ -1,45 +1,31 @@
 import pandas as pd
-def applyAverageStrategy(group_matrix):
-    # Sum each column in the matrix and create a dictionary where keys are column names (listing_ids) and values are the sums
-    column_sums = {}
-
-    # Iterate over each column in the DataFrame
-    for listing_id in group_matrix.columns:
-        # Sum the values of the column and store in the dictionary
-        column_sums[listing_id] = group_matrix[listing_id].sum()
-
-    # choose the biggest 10
-    top_10 = sorted(column_sums.items(), key=lambda item: item[1], reverse=True)[:10]
-
-    # Print the lowest 10 listings with their sums
-    for key, value in top_10:
-        print(f"Listing ID: {key}, Sum: {value}")
 
 def applyLeastMisery(group_matrix):
-    # Find the maximum score for each listing
     most_pleasure_scores = group_matrix.min()
-
-    # Sort the items based on most pleasure score in descending order
-    top_10_most_pleasure = most_pleasure_scores.sort_values(ascending=False).head(10)
-
-    # Print the top 10 listings with the highest most pleasure scores
-    print("Top 10 listings based on Most Pleasure strategy:")
-    for listing_id, score in top_10_most_pleasure.items():
-        print(f"Listing ID: {listing_id}, Most Pleasure Score: {score}")
+    top_10 = most_pleasure_scores.sort_values(ascending=False).head(10)
+    dict = {}
+    for listing_id, score in top_10.items():
+        dict[listing_id] = score
+    return dict
     
     
 def applyMostPleasure(group_matrix):
-    # Find the maximum score for each listing
     most_pleasure_scores = group_matrix.max()
+    top_10 = most_pleasure_scores.sort_values(ascending=False).head(10)
+    dict = {}
+    for listing_id, score in top_10.items():
+        dict[listing_id] = score
+    return dict
 
-    # Sort the items based on most pleasure score in descending order
-    top_10_most_pleasure = most_pleasure_scores.sort_values(ascending=False).head(10)
 
-    # Print the top 10 listings with the highest most pleasure scores
-    print("Top 10 listings based on Most Pleasure strategy:")
-    for listing_id, score in top_10_most_pleasure.items():
-        print(f"Listing ID: {listing_id}, Most Pleasure Score: {score}")
-
+def applyAverageStrategy(group_matrix):
+    column_sums = group_matrix.sum()
+    top_10 = column_sums.sort_values(ascending=False).head(10)
+    dict = {}
+    for listing_id, score in top_10.items():
+        dict[listing_id] = score
+    return dict
+    
 
 def computeRatingsMatrix(content_based_recs_list, listings_id):
     ratings_matrix = pd.DataFrame()

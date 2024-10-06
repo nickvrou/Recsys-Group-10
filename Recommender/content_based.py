@@ -93,7 +93,7 @@ def get_content_based_recommendations(listing_id, df_grouped, combined_features,
 
 
 
-    similar_indices = [i[0] for i in sim_scores[:num_recommendations]]
+    similar_indices = [i[0] for i in sim_scores[1:num_recommendations+1]]
 
     recommendations = df_grouped.iloc[similar_indices]
 
