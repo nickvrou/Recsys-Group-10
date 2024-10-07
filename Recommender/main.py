@@ -108,6 +108,7 @@ def run_recommender_pipeline():
 
     # Apply popularity filtering to the MMR recommendations
     if not mmr_recs.empty:
+
         mmr_recs_with_popularity = calculate_popularity_score(mmr_recs)  # Apply popularity score
         sorted_mmr_recs = mmr_recs_with_popularity.sort_values(by='popularity_score', ascending=False).head(5)
 
