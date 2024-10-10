@@ -51,4 +51,3 @@ The system supports filtering based on the number of guests and price range
 ## Online user survey
 
 Link for the survey: https://qualtricsxmcrj5srxjl.qualtrics.com/jfe/form/SV_esoFBJUz9qFqW58
-![image](https://github.com/user-attachments/assets/c02d9c3d-2944-4c96-95db-fafd658f6c04)
