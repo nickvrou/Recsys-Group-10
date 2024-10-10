@@ -11,7 +11,9 @@ This project implements an **Airbnb Recommender System** using a combination of 
 
 ## Repository Structure
 
+```
 Recommender/
+
 │
 ├── __pycache__/           
 ├── __init__.py            # Initialization for the Recommender package (used for group recommender in teh beginning)
@@ -26,6 +28,7 @@ Recommender/
 ├── original_dataset.zip    # Original Airbnb dataset  - not preprocessed (for recommendations)
 ├── final_preprocessed (3).zip  #Preprocessed
 
+```
 
 ## Usage
 
@@ -46,7 +49,9 @@ The system supports filtering based on the number of guests and price range
 1) Clone directory
 2) Install required packages (pip install -r requirements.txt)
 3) Download the pre-trained Word2Vec model (open source online)
-4) Run the main.py and get recommendations and explanations
+4) Run the main.py
+5) Type criteria in terminal (number of guests, price range, description etc.) for each family member
+6) Get recommendations
 
 ## Online user survey
 
