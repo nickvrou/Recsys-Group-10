@@ -113,7 +113,7 @@ def build_combined_features(df):
 
     # Process structured features (bedrooms, beds, etc.) and scale them
     structured_features = np.array(
-        df_grouped[['bedrooms', 'beds', 'minimum_nights', 'distance_to_center', 'bathrooms']])
+        df_grouped[['bedrooms', 'beds', 'minimum_nights', 'distance_to_center', 'bathrooms','property_type_encoded']])
     scaler = StandardScaler()
     structured_features_scaled = scaler.fit_transform(structured_features)
 
