@@ -25,8 +25,8 @@ Recommender/
 ├── main.py                 # Group-recommender activation-logic code
 ├── popularity_filtering.py # Popularity-based scoring and recommendation filtering
 ├── requirements.txt        # Required Python packages and dependencies
-├── original_dataset.zip    # Original Airbnb dataset  - not preprocessed (for recommendations)
-├── final_preprocessed (3).zip  #Preprocessed
+├── original_dataset.zip    # Original Airbnb dataset  - not preprocessed (for recommendation visualizations)
+├── final_preprocessed (3).zip  #Preprocessed dataset (for content-based)
 
 ```
 
